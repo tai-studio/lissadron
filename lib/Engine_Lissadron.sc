@@ -20,16 +20,15 @@ Engine_Lissadron : CroneGenEngine {
 	*synthDef { // TODO: move ugenGraphFunc to here...
 		^SynthDef(\lissadron, {|
 				in = 0, out = 0, amp = 0,
-				baseFreq = 100, midiNote = 43,
+				midiNote = 43,
 				seed = 2020,
-				// slfoFreq = 0, slfoSteps = 0,
 				lTime = 1,
 				attack = 0.01, decay = 0.1,
 				trig = 0, trigOnSeed = 1,
 				seedOffset = 0
 			|
 			var numOscs = 4;
-			var fRels, freqs, phases, amps, oscillators, src;
+			var fRels, baseFreq, freqs, phases, amps, oscillators, src;
 			var numParams, numMCtl, x, y, weights, seedTrig, seedOffsetTrig, midiTrig;
 
 			// controlled parameters
@@ -42,8 +41,7 @@ Engine_Lissadron : CroneGenEngine {
 			// ensure mute when at -90 db;
 			amp = max(0, amp.dbamp - (-90.dbamp));
 
-			baseFreq = baseFreq.varlag(0.3, start: baseFreq);
-			baseFreq = min((baseFreq.cpsmidi + midiNote).midicps, 20000);
+			baseFreq = midiNote.midicps;
 
 			seed = seed + seedOffset;
 			seedTrig = Changed.kr(seed);// + Impulse.kr(0);

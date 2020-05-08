@@ -41,8 +41,7 @@ function init_ctls()
   makeSynthCtl("amp", -90, 0, "linear", 0.0, -50, "")
   makeSynthCtl("attack", 0.01, 2, "linear", 0.0, 0.05, "")
   makeSynthCtl("decay", 0, 2, "linear", 0.0, 1, "")
-  makeSynthCtl("baseFreq", 20, 2000, "exp", 0.0, 86, "")
-  makeSynthCtl("midiNote", 1, 110, "exp", 1.0, 43, "")
+  makeSynthCtl("midiNote", 1, 110, "linear", 0.25, 43, "")
   makeSynthCtl("seed", 0, 18013, "linear", 1, 2020, "")
   params:add_separator()
   makeSynthCtl("x0", -1, 1, "linear", 0.0, 0, "")
@@ -196,7 +195,6 @@ end
 
 function draw_params()
   amp = params:get_raw("amp")
-  baseFreq = params:get_raw("baseFreq")
   seed = params:get("seed")
   math.randomseed(seed)
 
@@ -280,7 +278,7 @@ function enc(n, delta)
   local delta = delta
   if n == en.e1 then
     if state.shift then 
-      params:delta("baseFreq", delta)
+      params:delta("midiNote", delta)
     else
       params:delta("amp", delta)
     end
