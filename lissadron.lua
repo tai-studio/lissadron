@@ -39,8 +39,8 @@ local viewport = { width = 128, height = 64, c_width = 64, c_height = 32, frame 
 
 function init_ctls()
   makeSynthCtl("amp", -90, 0, "linear", 0.0, -50, "")
-  makeSynthCtl("attack", 0.01, 2, "linear", 0.0, 0.05, "")
-  makeSynthCtl("decay", 0, 2, "linear", 0.0, 1, "")
+  makeSynthCtl("attack", 0.01, 0.8, "linear", 0.0, 0.05, "")
+  makeSynthCtl("decay", 0, 1, "linear", 0.0, 1, "")
   makeSynthCtl("midiNote", 1, 110, "linear", 0.25, 43, "")
   makeSynthCtl("seed", 0, 18013, "linear", 1, 2020, "")
   params:add_separator()
@@ -49,7 +49,7 @@ function init_ctls()
   params:add_separator()
   makeCtl("slfoFreq", 1, 40,  "linear", 1, 1, "")
   makeCtl("slfoSteps", 1, 24, "linear", 1, 1)
-  makeSynthCtl("lTime", 0.01, 3, "exp", 0, 0.1)
+  makeSynthCtl("lTime", 0, 10, "linear", 0, 0.1)
   makeSynthCtl("trigOnSeed", 0, 1, "linear", 1, 1, "")
   params:bang()
 end
@@ -59,6 +59,19 @@ function init_screenTimer()
   screen_timer.time = 1 / 15
   screen_timer.event = function() redraw() end
   screen_timer:start()
+
+  local viewReleaseFunc = function () 
+    while true do
+      if state.lastTouchedCounter > 0 then
+        state.lastTouchedCounter = state.lastTouchedCounter - 1
+      end
+      -- print(state.lastTouchedCounter)
+      clock.sleep(0.2); 
+    end
+  end
+  
+  state.lastTouchedCounter = 0
+  clock.run(viewReleaseFunc)
 end
 
 
@@ -78,7 +91,7 @@ function sequencer()
     local lastOffset = seedOffset
     local steps = params:get("slfoSteps")
     local freq = 1/params:get("slfoFreq")
-    print(freq)
+    -- print(freq)
 
     if (steps > 1) then
       seedOffset = (seedOffset + 1)%steps
@@ -91,7 +104,9 @@ function sequencer()
 
     if lastOffset ~= seedOffset then
       engine.seedOffset(seedOffset)
+      redraw()
     end
+
     clock.sync(freq)
   end
 end
@@ -133,7 +148,7 @@ function update_from_midi(msg)
     params:set("midiNote", msg.note)
     if (sequencer_id == nil) or (params:get("slfoSteps") == 1) then -- trigger if sequencer is not running
       engine.trig(1)
-      print(msg.note)
+      -- print(msg.note)
       offFunc = function() 
         clock.sleep(0.01)
         engine.trig(0)
@@ -175,14 +190,23 @@ end
 
 --- drawing ----------------------------------
 
-function draw_state(x, y, size, brightness, amp, lTime, x0, x1)
+function draw_state(x, y, size, brightness, amp, lTime, x0, x1, selected)
   -- screen.aa(0)
   screen.line_width(1)
-  screen.level(math.random(1, brightness))
+  local level = math.random(1, brightness)
+
   local w = 1 + (size * x0)
   local h = 1 + (size * x1)
+  if selected then
+    screen.level(16)
+    screen.rect(x - (w/2), y - (h/2), w + 1, h + 1)
+    screen.fill()
+  end
+
+  screen.level(level)
   screen.rect(x - (w/2), y - (h/2), w, h)
   screen.fill()
+
 end
 
 function draw_value(x, y, size, brightness, value)
@@ -204,11 +228,6 @@ function draw_params()
   local slfoSteps = math.floor(params:get("slfoSteps"))
   local lTime = params:get_raw("lTime")
 
-  -- amp visualisation?
-  -- screen.aa(1)
-  -- screen.circle(viewport.c_width, viewport.c_height, 1 + (amp * viewport.c_height * 0.8))
-  -- screen.stroke()
-
   screen.aa(0)
 
   screen.level(math.random(1, 15))
@@ -217,27 +236,36 @@ function draw_params()
   screen.level(math.random(1, 15))
   screen.rect(0, viewport.c_height-14, viewport.width, 14)
   screen.fill()
-  screen.level(math.floor(slfoFreq * 16))
+  screen.level(math.floor((1-slfoFreq) * 16))
   screen.rect(0, viewport.c_height-28, viewport.width, 14)
   screen.fill()
 
   slfoSteps = math.min(slfoSteps, 24) -- prevent too many objects to be drawn
   size = 10
   dt = viewport.width/slfoSteps
-  for i=1,slfoSteps do
-    draw_state(
-      dt * i - (dt*0.5),
-      viewport.c_height,
-      size, 10,
-      amp, lTime, x0, x1
-    )
+  if slfoSteps > 1 then
+    -- print(seedOffset)
+    for i=1,slfoSteps do
+      draw_state(
+        dt * i - (dt*0.5),
+        viewport.c_height,
+        size, 16,
+        amp, lTime, x0, x1, ((seedOffset+1) == i)
+      )
+    end
+  else
+      draw_state(
+        dt/2,
+        viewport.c_height,
+        size, 16,
+        amp, lTime, x0, x1, false
+      )
   end
 
-  if state.lastTouchedCtl ~= nil then
+  if state.lastTouchedCounter > 0 then
     local val = params:get(state.lastTouchedCtl)
-    draw_value(viewport.c_width/2, 12, 10, state.lastTouchedCounter, string.format("%.2f", val))
+    draw_value(viewport.c_width/2, viewport.c_width - 10, 10, math.min(state.lastTouchedCounter, 16), string.format("%.2f", val))
   end
-
 end
 
 function redraw()
@@ -302,28 +330,15 @@ end
 
 --- helpers ----------------------------------
 
+
+
 function makeSynthCtl(name, min, max, warp, default, start, label)
   local spec = controlspec.new(min, max, warp, default, start, label)
   specs[name] = spec
 
-
   local updateFunc = function(val) 
     state.lastTouchedCtl = name
-    state.lastTouchedCounter = 16
-    -- if state.lastTouchedClock_id ~=nil then
-    --   clock.cancel(state.lastTouchedClock_id)
-    -- end
-    
-    local viewReleaseFunc = function() 
-      clock.sleep(0.5); 
-      while state.lastTouchedCounter > 0 do
-        state.lastTouchedCounter = state.lastTouchedCounter - 1
-        clock.sleep(0.2); 
-      end
-      state.lastTouchedCtl = nil 
-    end
-    
-    clock.run(viewReleaseFunc)
+    state.lastTouchedCounter = 32
     engine[name](val) 
   end
 
@@ -341,20 +356,8 @@ function makeCtl(name, min, max, warp, default, start, label)
 
   local updateFunc = function(val) 
     state.lastTouchedCtl = name
-    if state.lastTouchedClock_id ~=nil then
-      clock.cancel(state.lastTouchedClock_id)
-    end
-    
-    local viewReleaseFunc = function() 
-      clock.sleep(0.5); 
-      while state.lastTouchedCounter > 0 do
-        state.lastTouchedCounter = state.lastTouchedCounter - 1
-        clock.sleep(0.2); 
-      end
-      state.lastTouchedCtl = nil 
-    end
-    
-    clock.run(viewReleaseFunc)
+    state.lastTouchedCounter = 32
+    -- engine[name](val) 
   end
 
   params:add{
