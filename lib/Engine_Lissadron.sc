@@ -11,18 +11,19 @@ Engine_Lissadron : CroneGenEngine {
 	\x1: [-1, 1, \lin].asSpec,
 	\x2: [-1, 1, \lin].asSpec,
 	\baseFreq: [10, 4000, \exp].asSpec,
-	\seed: [10, 18013, \lin, 1].asSpec,
+	\seed: [0, 16383, \lin, 1].asSpec,
 	\seedOffset: [0, 24, \lin, 1, 0].asSpec,
 	\amp: [-90, 0, \linear, 0.0, 0, ""].asSpec,
+	\note: \midinote.asSpec
 		)
 	}
 
-	*synthDef { // TODO: move ugenGraphFunc to here...
+	*synthDef {
 		^SynthDef(\lissadron, {|
 				in = 0, out = 0, amp = 0,
-				midiNote = 43,
+				note = 43,
 				seed = 2020,
-				lTime = 1,
+				lazy = 1,
 				attack = 0.01, decay = 0.1,
 				trig = 0, trigOnSeed = 1,
 				seedOffset = 0
@@ -37,16 +38,16 @@ Engine_Lissadron : CroneGenEngine {
 
 			// manual controlled params
 
-			amp = amp.varlag(0.1 * lTime, start: amp);
+			amp = amp.varlag(0.1 * lazy, start: amp);
 			// ensure mute when at -90 db;
 			amp = max(0, amp.dbamp - (-90.dbamp));
 
-			baseFreq = midiNote.midicps;
+			baseFreq = note.midicps;
 
 			seed = seed + seedOffset;
 			seedTrig = Changed.kr(seed);// + Impulse.kr(0);
 			seedOffsetTrig = Changed.kr(seedOffset);
-			midiTrig = Changed.kr(midiNote);
+			midiTrig = Changed.kr(note);
 
 			// controlled randomness
 			RandID.ir(1000.rand);
@@ -84,10 +85,10 @@ Engine_Lissadron : CroneGenEngine {
 					}.sum
 				};
 
-				detune   = y[ 0].linlin(-1, 1,  0,    10).varlag(0.3 * lTime, start:   0);
-				lp       = y[ 1].linlin(-1, 1,  0,     1).varlag(1 * lTime  , start:   0);
-				lpFreq   = y[ 2].linexp(-1, 1, 20, 10000).varlag(1 * lTime  , start: 447);
-				irreg    = y[ 3].linlin(-1, 1,  0,     1).varlag(1 * lTime  , start:   0);
+				detune   = y[ 0].linlin(-1, 1,  0,    10).varlag(0.3 * lazy, start:   0);
+				lp       = y[ 1].linlin(-1, 1,  0,     1).varlag(1 * lazy  , start:   0);
+				lpFreq   = y[ 2].linexp(-1, 1, 20, 10000).varlag(1 * lazy  , start: 447);
+				irreg    = y[ 3].linlin(-1, 1,  0,     1).varlag(1 * lazy  , start:   0);
 
 
 				/////// multi-dim parameters
@@ -95,13 +96,13 @@ Engine_Lissadron : CroneGenEngine {
 					w.collect{|w, i|
 						x[i] * w
 					}.sum
-				}.linlin(-1, 1, 1, 10).collect{|v| v.varlag(1 * lTime, start: 0)}; // change range here
+				}.linlin(-1, 1, 1, 10).collect{|v| v.varlag(1 * lazy, start: 0)}; // change range here
 
 				idxs = Demand.kr(seedTrig, 0, {Dwhite(-1, 1)}!(numMCtl*numOscs)).clump(numMCtl).collect{|w|
 					w.collect{|w, i|
 						x[i] * w
 					}.sum
-				}.linlin(-1, 1, 0, 3).collect{|v| v.varlag(1 * lTime, start: 0)}; // change range here
+				}.linlin(-1, 1, 0, 3).collect{|v| v.varlag(1 * lazy, start: 0)}; // change range here
 
 
 				freqs = (fRels * baseFreq + ([-0.25, 0.25] * detune));
@@ -118,7 +119,7 @@ Engine_Lissadron : CroneGenEngine {
 						DelayL.ar(SinOscFB.ar(freq, feedback: min(idx, 1), mul: amp), 0.1, phase/freq),
 						DelayL.ar(LFTri.ar(freq, mul: amp), 0.1, phase/freq),
 						DelayL.ar(VarSaw.ar(freq, 0.5, width: min(1, max(0.5, idx/2)), mul: amp), 0.1, phase/freq),
-						DelayL.ar(LFPulse.ar(freq, width: 0.5, mul: amp), 0.1, phase/freq, 2, -1),
+						DelayL.ar(LFPulse.ar(freq, width: 0.1, mul: amp), 0.1, phase/freq, 2, -1),
 					], wrap: true)
 				};
 

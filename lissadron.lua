@@ -7,23 +7,28 @@
 --
 -- @LFSaw            [20200227]
 -- 
--- E1 fix amp 
+-- K1 shift
+-- 
+-- E1 legato amp
 -- E2 x
 -- E3 y
 -- K2 seed-1
+-- <shift>-K2 seed-131
 -- K3 seed+1
--- K1 shift
--- <shift>-E1 tune 
+-- <shift>-K3 seed+131
+--
+-- <shift>-E1 note 
 -- <shift>-E2 seed-steps
 -- <shift>-E3 seed-step frequency
--- <shift>-K2 randomise seed
--- <shift>-K3 seed+1
 -- 
--- https://llllllll.co/t/haven/
+-- https://llllllll.co/t/lissadron/
 
 engine.name = "Lissadron"
 
-local state = {shift = false, lastTouchedCtl = nil, lastTouchedCounter = 0, lastTouchedClock_id = nil}
+bjorklund = require "lissadron/lib/bjorklund"
+
+
+state = {shift = false, last_touched_ctl = nil, last_touched_counter = 0, seed_offset = 0, seq_pattern = nil}
 
 -- knobs and encoders
 local kn = { k1=1, k2=2, k3=3 }
@@ -38,19 +43,21 @@ local viewport = { width = 128, height = 64, c_width = 64, c_height = 32, frame 
 --- inits ----------------------------------
 
 function init_ctls()
-  makeSynthCtl("amp", -90, 0, "linear", 0.0, -50, "")
-  makeSynthCtl("attack", 0.01, 0.8, "linear", 0.0, 0.05, "")
-  makeSynthCtl("decay", 0, 1, "linear", 0.0, 1, "")
-  makeSynthCtl("midiNote", 1, 110, "linear", 0.25, 43, "")
-  makeSynthCtl("seed", 0, 18013, "linear", 1, 2020, "")
+  make_synth_ctl("amp", -90, 0, "linear", 0.0, -50, "")
+  make_synth_ctl("attack", 0.01, 0.8, "linear", 0.0, 0.05, "")
+  make_synth_ctl("decay", 0, 1, "linear", 0.0, 1, "")
+  make_seq_dependant_ctl("note", 0, 127, "linear", 0.25, 43, "")
+  make_seq_dependant_ctl("seed", 0, 16383, "linear", 1, 2020, "") -- 14bit
   params:add_separator()
-  makeSynthCtl("x0", -1, 1, "linear", 0.0, 0, "")
-  makeSynthCtl("x1", -1, 1, "linear", 0.0, 0, "")
+  make_synth_ctl("x0", -1, 1, "linear", 0.0, 0, "")
+  make_synth_ctl("x1", -1, 1, "linear", 0.0, 0, "")
   params:add_separator()
-  makeCtl("slfoFreq", 1, 40,  "linear", 1, 1, "")
-  makeCtl("slfoSteps", 1, 24, "linear", 1, 1)
-  makeSynthCtl("lTime", 0, 10, "linear", 0, 0.1)
-  makeSynthCtl("trigOnSeed", 0, 1, "linear", 1, 1, "")
+  make_ctl("seq_freq", 1, 40,  "linear", 1, 1, "")
+  make_ctl("seq_steps", 1, 24, "linear", 1, 1)
+  make_ctl("seq_pulses", 1, 24, "linear", 1, 24)
+  make_ctl("seq_shift", 0, 24, "linear", 1, 0)
+  make_synth_ctl("lazy", 0, 10, "linear", 0, 0.1)
+  make_synth_ctl("trigOnSeed", 0, 1, "linear", 1, 1, "")
   params:bang()
 end
 
@@ -62,48 +69,64 @@ function init_screenTimer()
 
   local viewReleaseFunc = function () 
     while true do
-      if state.lastTouchedCounter > 0 then
-        state.lastTouchedCounter = state.lastTouchedCounter - 1
+      if state.last_touched_counter > 0 then
+        state.last_touched_counter = state.last_touched_counter - 1
       end
-      -- print(state.lastTouchedCounter)
+      -- print(state.last_touched_counter)
       clock.sleep(0.2); 
     end
   end
   
-  state.lastTouchedCounter = 0
+  state.last_touched_counter = 0
   clock.run(viewReleaseFunc)
 end
 
 
 --- sequencing ----------------------------------
 
-local sequencer_id -- clock id for sequencer position
-local seedOffset
+local seq_id -- clock id for sequencer position
 
-function init_sequencer()
-  seedOffset = 0
-  sequencer_id = clock.run(sequencer)
+function init_seq()
+  state.seed_offset = 0
+  params:set("seq_steps", 1)
+
+  state.seq_pattern = bjorklund.bjorklund(1, 1, 0)
+  seq_id = clock.run(sequencer)
 end
   
 
 function sequencer()
   while true do
-    local lastOffset = seedOffset
-    local steps = params:get("slfoSteps")
-    local freq = 1/params:get("slfoFreq")
-    -- print(freq)
+    local last_offset = state.seed_offset
+    local steps = params:get("seq_steps")
+    local freq  = 1/params:get("seq_freq")
+    local pulses = params:get("seq_pulses")
+    local shift  = params:get("seq_shift")
 
+ 
     if (steps > 1) then
-      seedOffset = (seedOffset + 1)%steps
+      state.seq_pattern = bjorklund.bjorklund(steps, pulses, shift)
+      state.seed_offset = (state.seed_offset + 1)%steps
     else 
-      seedOffset = 0
-      engine.seedOffset(seedOffset)
-      -- sequencer_id = nil
+      state.seed_offset = 0
+      engine.seedOffset(0)
+      -- seq_id = nil
       -- break
     end
 
-    if lastOffset ~= seedOffset then
-      engine.seedOffset(seedOffset)
+    if (last_offset ~= state.seed_offset) then
+      if (state.seq_pattern[state.seed_offset+1] == 1) then
+        -- print(state.seed_offset)
+        engine.note(params:get("note"))
+        engine.seed(params:get("seed"))
+        engine.trig(1)
+        engine.seedOffset(state.seed_offset)
+          local offFunc = function() 
+          clock.sleep(0.01)
+          engine.trig(0)
+        end
+        clock.run(offFunc)
+      end
       redraw()
     end
 
@@ -112,17 +135,17 @@ function sequencer()
 end
 
 function clock.transport.start()
-  if (sequencer_id ~= nil) then
-    clock.cancel(sequencer_id)
+  if (seq_id ~= nil) then
+    clock.cancel(seq_id)
   end
   print("clock-start")
-  init_sequencer()
+  init_seq()
 end
 
 function clock.transport.stop()
-  if sequencer_id ~= nil then
-    clock.cancel(sequencer_id)
-    sequencer_id = nil
+  if seq_id ~= nil then
+    clock.cancel(seq_id)
+    seq_id = nil
     print("clock-stop")
   end
 end
@@ -145,35 +168,22 @@ end
 
 function update_from_midi(msg)
   if msg.type == 'note_on' then
-    params:set("midiNote", msg.note)
-    if (sequencer_id == nil) or (params:get("slfoSteps") == 1) then -- trigger if sequencer is not running
+    params:set("note", msg.note)
+    if (seq_id == nil) or (params:get("seq_steps") == 1) then -- trigger if sequencer is not running
       engine.trig(1)
       -- print(msg.note)
-      offFunc = function() 
+      local offFunc = function() 
         clock.sleep(0.01)
         engine.trig(0)
       end
       clock.run(offFunc)
     end
   end
-  -- if msg.type == 'note_off' then
-  --   engine.trig(0)
-  -- end
 
   -- OP-1 fix for transport
   if msg.type == 'song_position' then
     clock.transport.start()
   end
-  -- if msg.type == 'stop' then
-  --   clock.transport.stop()
-  -- end
-  -- if msg.type == 'start' then
-  --   clock.transport.start()
-  -- end
-
-  -- if msg.type ~= "clock" then
-  --   print(msg.type)
-  -- end
 end
 
 ----------------------------------------------
@@ -181,7 +191,7 @@ function init()
   midi_connect()
   init_ctls()
   init_screenTimer()
-  init_sequencer()
+  init_seq()
   screen.level(viewport.hilight)
   screen.line_width(1)
   screen.font_size(10)
@@ -190,10 +200,10 @@ end
 
 --- drawing ----------------------------------
 
-function draw_state(x, y, size, brightness, amp, lTime, x0, x1, selected)
+function draw_state(x, y, size, brightness, amp, lazy, x0, x1, selected)
   -- screen.aa(0)
   screen.line_width(1)
-  local level = math.random(1, brightness)
+  local level = math.random(1, math.max(1, brightness))
 
   local w = 1 + (size * x0)
   local h = 1 + (size * x1)
@@ -203,9 +213,11 @@ function draw_state(x, y, size, brightness, amp, lTime, x0, x1, selected)
     screen.fill()
   end
 
-  screen.level(level)
-  screen.rect(x - (w/2), y - (h/2), w, h)
-  screen.fill()
+  if brightness > 0 then
+    screen.level(level)
+    screen.rect(x - (w/2), y - (h/2), w, h)
+    screen.fill()
+  end
 
 end
 
@@ -217,6 +229,8 @@ function draw_value(x, y, size, brightness, value)
   screen.text_center(tostring(value))
 end
 
+
+-- draw everything
 function draw_params()
   amp = params:get_raw("amp")
   seed = params:get("seed")
@@ -224,9 +238,9 @@ function draw_params()
 
   x0 = params:get_raw("x0")
   x1 = params:get_raw("x1")
-  local slfoFreq = 1 - params:get_raw("slfoFreq")
-  local slfoSteps = math.floor(params:get("slfoSteps"))
-  local lTime = params:get_raw("lTime")
+  local seq_freq = 1 - params:get_raw("seq_freq")
+  local seq_steps = math.floor(params:get("seq_steps"))
+  local lazy = params:get_raw("lazy")
 
   screen.aa(0)
 
@@ -236,45 +250,59 @@ function draw_params()
   screen.level(math.random(1, 15))
   screen.rect(0, viewport.c_height-14, viewport.width, 14)
   screen.fill()
-  screen.level(math.floor((1-slfoFreq) * 16))
+  screen.level(math.floor((1-seq_freq) * 16))
   screen.rect(0, viewport.c_height-28, viewport.width, 14)
   screen.fill()
 
-  slfoSteps = math.min(slfoSteps, 24) -- prevent too many objects to be drawn
+  seq_steps = math.min(seq_steps, 24) -- prevent too many objects to be drawn
   size = 10
-  dt = viewport.width/slfoSteps
-  if slfoSteps > 1 then
-    -- print(seedOffset)
-    for i=1,slfoSteps do
-      draw_state(
-        dt * i - (dt*0.5),
-        viewport.c_height,
-        size, 16,
-        amp, lTime, x0, x1, ((seedOffset+1) == i)
-      )
+  dt = viewport.width/seq_steps
+  if seq_steps > 1 then
+    -- make sure to have the right pattern size
+    if #state.seq_pattern ~= seq_steps then
+      state.seq_pattern = bjorklund.bjorklund(params:get("seq_steps"), params:get("seq_pulses"), params:get("seq_shift"))
+    end
+
+    for i=1,seq_steps do
+      if state.seq_pattern[i] > 0 then
+        draw_state(
+          dt * i - (dt*0.5),
+          viewport.c_height,
+          size, 16,
+          amp, lazy, x0, x1, ((state.seed_offset+1) == i)
+        )
+      else
+        draw_state(
+          dt * i - (dt*0.5),
+          viewport.c_height,
+          size, 0,
+          amp, lazy, x0, x1, ((state.seed_offset+1) == i)
+        )
+      end
     end
   else
       draw_state(
         dt/2,
         viewport.c_height,
         size, 16,
-        amp, lTime, x0, x1, false
+        amp, lazy, x0, x1, false
       )
   end
 
-  if state.lastTouchedCounter > 0 then
-    local val = params:get(state.lastTouchedCtl)
-    draw_value(viewport.c_width/2, viewport.c_width - 10, 10, math.min(state.lastTouchedCounter, 16), string.format("%.2f", val))
+  if state.last_touched_counter > 0 then
+    local val = params:get(state.last_touched_ctl)
+    draw_value(viewport.c_width/2, viewport.c_width - 10, 10, math.min(state.last_touched_counter, 16), string.format("%.2f", val))
   end
 end
 
+
+
+
+
+
 function redraw()
   screen.clear()
-
   draw_params()
-
-  -- print(state.lastTouchedCounter)
-
   screen.update()
 end
 
@@ -306,21 +334,21 @@ function enc(n, delta)
   local delta = delta
   if n == en.e1 then
     if state.shift then 
-      params:delta("midiNote", delta)
+      params:delta("note", delta)
     else
       params:delta("amp", delta)
     end
   end    
   if n == en.e2 then
     if state.shift then 
-      params:delta("slfoSteps", delta)
+      params:delta("seq_steps", delta)
     else
       params:delta("x0", delta)
     end
   end
   if n == en.e3 then
     if state.shift then 
-      params:delta("slfoFreq", delta)
+      params:delta("seq_freq", delta)
     else
       params:delta("x1", delta)
     end
@@ -330,15 +358,13 @@ end
 
 --- helpers ----------------------------------
 
-
-
-function makeSynthCtl(name, min, max, warp, default, start, label)
+function make_synth_ctl(name, min, max, warp, default, start, label)
   local spec = controlspec.new(min, max, warp, default, start, label)
   specs[name] = spec
 
-  local updateFunc = function(val) 
-    state.lastTouchedCtl = name
-    state.lastTouchedCounter = 32
+  local update_func = function(val) 
+    state.last_touched_ctl = name
+    state.last_touched_counter = 32
     engine[name](val) 
   end
 
@@ -346,17 +372,38 @@ function makeSynthCtl(name, min, max, warp, default, start, label)
     type="control",
     id=name,
     controlspec=spec,
-    action=updateFunc
+    action=update_func
   }
 end
 
-function makeCtl(name, min, max, warp, default, start, label)
+function make_seq_dependant_ctl(name, min, max, warp, default, start, label)
   local spec = controlspec.new(min, max, warp, default, start, label)
   specs[name] = spec
 
-  local updateFunc = function(val) 
-    state.lastTouchedCtl = name
-    state.lastTouchedCounter = 32
+  local update_func = function(val) 
+    state.last_touched_ctl = name
+    state.last_touched_counter = 32
+    if ( ((params:get("seq_steps") < 2) or (seq_id == nil)) ) then -- only update if sequencer is not running
+      engine[name](val) 
+    end
+  end
+
+  params:add{
+    type="control",
+    id=name,
+    controlspec=spec,
+    action=update_func
+  }
+end
+
+
+function make_ctl(name, min, max, warp, default, start, label)
+  local spec = controlspec.new(min, max, warp, default, start, label)
+  specs[name] = spec
+
+  local update_func = function(val) 
+    state.last_touched_ctl = name
+    state.last_touched_counter = 32
     -- engine[name](val) 
   end
 
@@ -364,7 +411,7 @@ function makeCtl(name, min, max, warp, default, start, label)
     type="control",
     id=name,
     controlspec=spec,
-    action=updateFunc
+    action=update_func
   }
 end
 
