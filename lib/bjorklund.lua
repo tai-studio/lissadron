@@ -1,3 +1,7 @@
+-- bjorklund 
+-- ported by Till Bovermann in 2020 
+-- from python code found at https://github.com/brianhouse/bjorklund (MIT License, Brian House)
+
 local myModule = {}
 
 function myModule.range(array, the_start, the_end)
@@ -16,6 +20,13 @@ function myModule.rotate(array, shift)
         out[idx+1] = array[i+1]
     end
     return out
+end
+
+function myModule.scramble(array)
+    for i = #array, 2, -1 do
+        local j = math.random(i)
+        list[i], list[j] = list[j], list[i]
+    end
 end
 
 function myModule.print(array)

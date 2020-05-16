@@ -9,7 +9,7 @@ Engine_Lissadron : CroneGenEngine {
 		^(
 	\x0: [-1, 1, \lin].asSpec,
 	\x1: [-1, 1, \lin].asSpec,
-	\x2: [-1, 1, \lin].asSpec,
+	// \x2: [-1, 1, \lin].asSpec,
 	\baseFreq: [10, 4000, \exp].asSpec,
 	\seed: [0, 16383, \lin, 1].asSpec,
 	\seedOffset: [0, 24, \lin, 1, 0].asSpec,
@@ -85,9 +85,9 @@ Engine_Lissadron : CroneGenEngine {
 					}.sum
 				};
 
-				detune   = y[ 0].linlin(-1, 1,  0,    10).varlag(0.3 * lazy, start:   0);
+				detune   = y[ 0].linlin(-1, 1,  0,     5).varlag(0.3 * lazy, start:   0);
 				lp       = y[ 1].linlin(-1, 1,  0,     1).varlag(1 * lazy  , start:   0);
-				lpFreq   = y[ 2].linexp(-1, 1, 20, 10000).varlag(1 * lazy  , start: 447);
+				lpFreq   = y[ 2].linexp(-1, 1, 20, 20000).varlag(1 * lazy  , start: 447);
 				irreg    = y[ 3].linlin(-1, 1,  0,     1).varlag(1 * lazy  , start:   0);
 
 
@@ -102,7 +102,7 @@ Engine_Lissadron : CroneGenEngine {
 					w.collect{|w, i|
 						x[i] * w
 					}.sum
-				}.linlin(-1, 1, 0, 3).collect{|v| v.varlag(1 * lazy, start: 0)}; // change range here
+				}.linlin(-1, 1, 0, 4).collect{|v| v.varlag(1 * lazy, start: 0)}; // change range here
 
 
 				freqs = (fRels * baseFreq + ([-0.25, 0.25] * detune));
@@ -119,7 +119,7 @@ Engine_Lissadron : CroneGenEngine {
 						DelayL.ar(SinOscFB.ar(freq, feedback: min(idx, 1), mul: amp), 0.1, phase/freq),
 						DelayL.ar(LFTri.ar(freq, mul: amp), 0.1, phase/freq),
 						DelayL.ar(VarSaw.ar(freq, 0.5, width: min(1, max(0.5, idx/2)), mul: amp), 0.1, phase/freq),
-						DelayL.ar(LFPulse.ar(freq, width: 0.1, mul: amp), 0.1, phase/freq, 2, -1),
+						DelayL.ar(LFPulse.ar(freq, width: min(2, idx).linlin(2, 4, 0.5, 0.01), mul: amp), 0.1, phase/freq, 2, -1),
 					], wrap: true)
 				};
 
