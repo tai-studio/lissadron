@@ -50,14 +50,14 @@ local intFormats = {seed = 1, seq_steps = 1, seq_freq = 1, note = 1}
 --- inits ----------------------------------
 
 function init_ctls()
-  make_synth_ctl("amp", -90, 0, "linear", 0.0, -50, "")
-  make_synth_ctl("attack", 0.01, 0.8, "linear", 0.0, 0.05, "")
-  make_synth_ctl("decay", 0, 1, "linear", 0.0, 1, "")
+  make_synth_ctl("amp", -90, 0, "linear", 0.0, -90, "")
+  make_synth_ctl("attack", 0.01, 0.8, "linear", 0.0, 0.02, "")
+  make_synth_ctl("decay", 0, 1, "linear", 0.0, 0.3, "")
   make_seq_dependant_ctl("note", 0, 127, "linear", 0.25, 52, "")
-  make_seq_dependant_ctl("seed", 0, 16383, "linear", 1, 2020, "") -- 14bit
+  make_seq_dependant_ctl("seed", 0, 16383, "linear", 1, 3079, "") -- 14bit
   params:add_separator()
-  make_synth_ctl("x0", 0, 1, "linear", 0.0, 0, "")
-  make_synth_ctl("x1", 0, 1, "linear", 0.0, 0, "")
+  make_synth_ctl("x0", 0, 1, "linear", 0.0, 0.5, "")
+  make_synth_ctl("x1", 0, 1, "linear", 0.0, 0.5, "")
   params:add_separator()
   make_ctl("seq_freq", 1, 40,  "linear", 1, 1, "")
   make_ctl("seq_steps", 1, 24, "linear", 1, 1)
