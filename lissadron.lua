@@ -5,8 +5,7 @@
 -- 
 -- 
 --
--- @LFSaw             
---[20200515]
+-- @LFSaw             [20200516]
 -- 
 -- E1 amp -- legato
 -- E2 x0  -- meta parameter

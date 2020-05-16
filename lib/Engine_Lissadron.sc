@@ -123,7 +123,7 @@ Engine_Lissadron : CroneGenEngine {
 					], wrap: true)
 				};
 
-				src = SelectX.ar(lp, [LPF.ar(src, lpFreq), LPF.ar(src, lpFreq/7)]);
+				src = SelectX.ar(lp, [LPF.ar(src, lpFreq), RLPF.ar(src, lpFreq/7, 0.2, 0.8)]);
 
 				src = Mix([src.softclip, src]) * 0.4;
 				src = Splay.ar(src);
