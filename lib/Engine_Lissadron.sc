@@ -14,7 +14,8 @@ Engine_Lissadron : CroneGenEngine {
 	\seed: [0, 16383, \lin, 1].asSpec,
 	\seedOffset: [0, 24, \lin, 1, 0].asSpec,
 	\amp: [-90, 0, \linear, 0.0, 0, ""].asSpec,
-	\note: \midinote.asSpec
+	\note: \midinote.asSpec,
+	\grit: [0, 1, \lin, 0, 0].asSpec
 		)
 	}
 
@@ -24,6 +25,7 @@ Engine_Lissadron : CroneGenEngine {
 				note = 43,
 				seed = 2020,
 				lazy = 1,
+				grit = 0,
 				attack = 0.01, decay = 0.1,
 				trig = 0, trigOnSeed = 1,
 				seedOffset = 0
@@ -123,7 +125,7 @@ Engine_Lissadron : CroneGenEngine {
 					], wrap: true)
 				};
 
-				src = SelectX.ar(lp, [LPF.ar(src, lpFreq), RLPF.ar(src, lpFreq/7, 0.2, 0.8)]);
+				src = SelectX.ar(lp, [LPF.ar(src, lpFreq), RLPF.ar(src, lpFreq/7, grit.linexp(0, 1, 2, 0.01), grit.linlin(0, 1, 1, 0.7))]);
 
 				src = Mix([src.softclip, src]) * 0.4;
 				src = Splay.ar(src);

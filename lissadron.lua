@@ -31,7 +31,7 @@
 
 engine.name = "Lissadron"
 
-bjorklund = require "lissadron/lib/bjorklund"
+bjorklund = include("lissadron/lib/bjorklund")
 
 
 state = {shift = false, last_touched_ctl = nil, last_touched_counter = 0, last_seed_offset = 0, seed_offset = 0, seq_pattern = nil}
@@ -64,6 +64,7 @@ function init_ctls()
   make_ctl("seq_fill", 0, 1, "linear", 0, 1)
   make_ctl("seq_shift", 0, 1, "linear", 0, 0)
   make_synth_ctl("lazy", 0.01, 1, "exp", 0.0, 0.1)
+  make_synth_ctl("grit", 0, 1, "lin", 0.0, 0.8)
   make_synth_ctl("trigOnSeed", 0, 1, "linear", 1, 1, "")
   params:bang()
 end
