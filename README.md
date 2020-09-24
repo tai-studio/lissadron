@@ -52,4 +52,6 @@ Sound engine by [LFSaw](http://lfsaw.de) ([Till Bovermann](http://tai-studio.org
 Changelog on [release-page](https://github.com/tai-studio/lissadron/releases)
 Discussion at [lines](https://llllllll.co/t/lissadron/)
 
+[![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/S6S72858T)
+
 ![](media/lissadron-cover2.jpg)
